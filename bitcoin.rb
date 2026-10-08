@@ -1,6 +1,7 @@
 require "socket"
 require "digest"
 require "timeout"
+require "irb"
 
 def connect(host = "127.0.0.1", port = 8333)
   socket = TCPSocket.open(host, port)
@@ -149,6 +150,62 @@ def handshake(socket = nil)
   return socket
 end
 
+# Call this manually after handshake(socket). For now, it only reads messages.
+def receive_messages(socket = nil)
+  unless socket && !socket.closed?
+    raise IOError, "Not connected. Run socket = connect first."
+  end
+  socket.getpeername
+
+  puts "Receiving messages. Press Ctrl-C to return to the console."
+
+  loop do
+    buffer = ''
+
+    # Look for the four magic bytes marking the next message.
+    loop do
+      byte = socket.read(1)
+      if byte.nil?
+        puts "The node closed the connection. Receiving stopped."
+        return
+      end
+
+      buffer += byte.unpack1("H*")
+      next unless buffer.size == 8 # 8 hexadecimal characters = 4 bytes
+
+      if buffer == 'f9beb4d9'
+        command_bytes     = read_bytes(socket, 12)
+        command           = command_bytes.delete("\x00")
+        payload_size      = read_bytes(socket, 4).unpack1("V")
+        received_checksum = read_bytes(socket, 4).unpack1("H*")
+
+        raise IOError, "Payload is too large." if payload_size > 4_000_000
+        payload = read_bytes(socket, payload_size).unpack1("H*")
+        unless checksum(payload) == received_checksum
+          raise IOError, "The #{command.inspect} payload checksum does not match."
+        end
+
+        puts "<-#{command}"
+        puts "magic_bytes: #{buffer}"
+        puts "command:     #{command}"
+        puts "size:        #{payload_size}"
+        puts "checksum:    #{received_checksum}"
+        puts "payload:     #{payload}"
+        puts
+
+        break # Finished one message; the outer loop starts the next one.
+      end
+
+      # Move forward one byte so magic bytes crossing a group boundary are found.
+      buffer = buffer[2..-1]
+    end
+  end
+rescue EOFError => error
+  puts "Receiving stopped: #{error.message}"
+rescue Interrupt, IRB::Abort
+  puts "\nStopped receiving. Socket remains open."
+end
+
 def disconnect(socket)
   socket.close unless socket.closed?
   puts "Disconnected."
@@ -156,8 +213,8 @@ end
 
 # Keep the Ruby process alive so you can issue more commands after the handshake.
 if $PROGRAM_NAME == __FILE__
-  require "irb"
   puts "Start: socket = connect; handshake(socket)"
+  puts "Then: receive_messages(socket)"
   puts "When finished: disconnect(socket)"
   IRB.start
 end
