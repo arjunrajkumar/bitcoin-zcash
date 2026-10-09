@@ -150,7 +150,7 @@ def handshake(socket = nil)
   return socket
 end
 
-# Call this manually after handshake(socket). For now, it only reads messages.
+# Call this manually after handshake(socket). It reads messages and replies to pings.
 def receive_messages(socket = nil)
   unless socket && !socket.closed?
     raise IOError, "Not connected. Run socket = connect first."
@@ -192,6 +192,22 @@ def receive_messages(socket = nil)
         puts "checksum:    #{received_checksum}"
         puts "payload:     #{payload}"
         puts
+
+        if command == "ping"
+          pong_command  = ascii2hex("pong")
+          pong_size     = reversebytes(size(hexadecimal(payload.length / 2), 4))
+          pong_checksum = checksum(payload)
+          pong_message  = "f9beb4d9" + pong_command + pong_size + pong_checksum + payload
+
+          socket.write([pong_message].pack("H*"))
+          puts "pong->"
+          puts "magic_bytes: f9beb4d9"
+          puts "command:     pong"
+          puts "size:        #{payload.length / 2}"
+          puts "checksum:    #{pong_checksum}"
+          puts "payload:     #{payload}"
+          puts
+        end
 
         break # Finished one message; the outer loop starts the next one.
       end
