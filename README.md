@@ -16,15 +16,27 @@ We're learning by building small experiments, inspecting the raw data, and addin
 
 ## What's here so far
 
-The code currently lives in one file, [`bitcoin.rb`](bitcoin.rb), with commands you run manually in a Ruby console:
+Each topic has its own small file. [`bitcoin.rb`](bitcoin.rb) loads them together and opens the same console, where you run commands manually:
 
-- Connect to a Bitcoin node and disconnect when finished.
-- Build and exchange `version` and `verack` messages.
-- Receive messages, check their checksums, and reply to `ping` with `pong`.
-- Explore hexadecimal, byte order, and double SHA256 hashing.
-- Reproduce the mining calculation for Bitcoin block 100,000.
+- [Connect to a Bitcoin node and disconnect when finished.](connection.rb)
+- [Build and exchange `version` and `verack` messages.](handshake.rb)
+- [Receive messages, check their checksums, and reply to `ping` with `pong`.](messages.rb)
+- [Explore hexadecimal, byte order, and double SHA256 hashing.](bytes.rb)
+- [Reproduce the mining calculation for Bitcoin block 100,000.](mining.rb)
 
 The implemented experiments are currently for Bitcoin. Zcash experiments and direct comparisons will be added as we learn. The Bitcoin handshake currently uses the tutorial's fixed example values, including its timestamp and advertised addresses.
+
+## File map
+
+| File | What it contains |
+| --- | --- |
+| [`connection.rb`](connection.rb) | `connect` and `disconnect` |
+| [`handshake.rb`](handshake.rb) | `version_message` and `handshake` |
+| [`messages.rb`](messages.rb) | Reading and checking messages, plus automatic pong replies |
+| [`bytes.rb`](bytes.rb) | Shared hexadecimal, byte-order, hashing, and checksum helpers |
+| [`mining.rb`](mining.rb) | The block 100,000 mining experiment |
+
+Each file loads the dependencies it needs with `require` or `require_relative`. For example, both handshake and mining use helpers from `bytes.rb`. You can inspect or load a topic on its own; loading a file never connects, starts receiving, or starts mining. The console entry point is still `ruby bitcoin.rb`.
 
 ## Run the console
 
@@ -83,6 +95,14 @@ mine
 Or start from another nonce with `mine(12345)`. Press **Ctrl-C** to stop and return to the console. Searching from zero and printing every attempt can take a long time.
 
 The search stops when the hash is at or below the target, or when it reaches the four-byte nonce limit. It reproduces a historical calculation; it does not submit a new block or earn a mining reward.
+
+## Run the offline checks
+
+```sh
+ruby test/bitcoin_test.rb
+```
+
+These checks use local socket pairs, without connecting to Bitcoin Core or a public peer. They cover the handshake, message checksums, ping/pong, disconnected reads, and the known block 100,000 hash. They require the `minitest` gem (`gem install minitest` if your Ruby installation does not include it).
 
 ## Learning reference
 
